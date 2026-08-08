@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Egg Simulator 2  (3D)</title>
+    </head>
+    <body>
+<!--New and improved test egg with 2000 lines of code!-->
+<canvas id="eggCanvas" width="600" height="600"></canvas>
+
+<div style="
+position:absolute;
+left:20px;
+top:20px;
+">
+
+<button id="zoomIn"
+style="
+font-size:24px;
+width:55px;
+height:55px;
+">
++
+</button>
+
+<br>
+
+<button id="zoomOut"
+style="
+font-size:24px;
+width:55px;
+height:55px;
+">
+-
+</button>
+
+<br>
+
+<button id="restart"
+style="
+font-size:16px;
+width:120px;
+height:45px;
+margin-top:10px;
+">
+Restart
+</button>
+
+</div>
+
+<script>
+
+/* =====================================================
+   CANVAS
+===================================================== */
+
+var canvas =
+    document.getElementById("eggCanvas");
+
+var ctx =
+    canvas.getContext("2d");
+
+
+/* =====================================================
+   CAMERA
+===================================================== */
+
+var camera = 900;
+
+var zoom = 1;
+
+
+/* =====================================================
+   ROTATION
+===================================================== */
+
+var rotationY = 0.25;
+
+var rotationX = -0.05;
+
+
+/* =====================================================
+   MOUSE
+===================================================== */
+
+var dragging = false;
+
+var lastX = 0;
+
+var lastY = 0;
+
+
+/* =====================================================
+   EGG SIZE
+===================================================== */
+
+var segments = 64;
+
+var eggRadius = 158;
+
+var egg = [];
+
+var half = [];
+
+var i;
+var j;
+
+
+/* =====================================================
+   BUILD EGG
+===================================================== */
+
+/*
+   Build rounded upper half.
+*/
+
+for (
+    i = 0;
+    i <= 40;
+    i++
+) {
+
+    var t =
+        i / 40;
+
+
+    var radius =
+        eggRadius *
+        Math.sin(
+            t *
+            Math.PI /
+            2
+        );
+
+
+    radius *=
+        0.88 +
+        0.12 * t;
+
+
+    half.push({
+
+        radius: radius,
+
+        y:
+            -210 +
+            t * 210
+
+    });
+
+}
+
+
+/*
+   Top half.
+*/
+
+for (
+    i = 0;
+    i < half.length;
+    i++
+) {
+
+    egg.push({
+
+        radius:
+            half[i].radius,
+
+        y:
+            half[i].y
+
+    });
+
+}
+
+
+/*
+   Bottom half.
+*/
+
+for (
+    i = half.length - 2;
+    i >= 0;
+    i--
+) {
+
+    egg.push({
+
+        radius:
+            half[i].radius,
+
+        y:
+            -half[i].y
+
+    });
+
+}
+
+
+/* =====================================================
+   CRACK STATE
+===================================================== */
+
+var crackStage = 0;
+
+
+/*
+   0 = normal
+
+   1 = small crack
+
+   2 = growing
+
+   3 = halfway
+
+   4 = almost complete
+
+   5 = complete
+
+   6 = split/open
+*/
+
+
+var shellOpened = false;
+
+
+/* =====================================================
+   SHELL PHYSICS
+===================================================== */
+
+var leftShell = {
+
+    x: -2,
+
+    y: 0,
+
+    vx: -2.4,
+
+    vy: -12,
+
+    rotation: 0,
+
+    angularVelocity: -0.035,
+
+    falling: false
+
+};
+
+
+var rightShell = {
+
+    x: 2,
+
+    y: 0,
+
+    vx: 2.4,
+
+    vy: -12,
+
+    rotation: 0,
+
+    angularVelocity: 0.035,
+
+    falling: false
+
+};
+
+
+/* =====================================================
+   PHYSICS SETTINGS
+===================================================== */
+
+var gravity = 0.42;
+
+var groundY = 245;
+
+var bounce = 0.25;
+
+
+/* =====================================================
+   HATCH LIGHT
+===================================================== */
+
+var lightTime = 0;
+
+
+/* =====================================================
+   CENTER CRACK
+===================================================== */
+
+var crackPoints = [];
+
+
+for (
+    i = 0;
+    i <= 28;
+    i++
+) {
+
+    var crackT =
+        i / 28;
+
+
+    var crackY =
+        105 +
+        crackT * 315;
+
+
+    var wobble =
+        Math.sin(
+            crackT *
+            Math.PI *
+            5
+        ) *
+        5;
+
+
+    crackPoints.push({
+
+        x:
+            300 +
+            wobble,
+
+        y:
+            crackY
+
+    });
+
+}
+
+
+/* =====================================================
+   RESET
+===================================================== */
+
+function resetEgg() {
+
+    crackStage = 0;
+
+    shellOpened = false;
+
+
+    rotationY =
+        0.25;
+
+    rotationX =
+        -0.05;
+
+
+    /*
+       LEFT SHELL
+    */
+
+    leftShell.x =
+        -2;
+
+    leftShell.y =
+        0;
+
+    leftShell.vx =
+        -2.4;
+
+    leftShell.vy =
+        -12;
+
+    leftShell.rotation =
+        0;
+
+    leftShell.angularVelocity =
+        -0.035;
+
+    leftShell.falling =
+        false;
+
+
+    /*
+       RIGHT SHELL
+    */
+
+    rightShell.x =
+        2;
+
+    rightShell.y =
+        0;
+
+    rightShell.vx =
+        2.4;
+
+    rightShell.vy =
+        -12;
+
+    rightShell.rotation =
+        0;
+
+    rightShell.angularVelocity =
+        0.035;
+
+    rightShell.falling =
+        false;
+
+
+    lightTime = 0;
+
+}
+
+
+document.getElementById(
+    "restart"
+).onclick =
+function() {
+
+    resetEgg();
+
+};
+
+
+/* =====================================================
+   ZOOM
+===================================================== */
+
+document.getElementById(
+    "zoomIn"
+).onclick =
+function() {
+
+    zoom += 0.15;
+
+
+    if (
+        zoom > 2.5
+    ) {
+
+        zoom = 2.5;
+
+    }
+
+};
+
+
+document.getElementById(
+    "zoomOut"
+).onclick =
+function() {
+
+    zoom -= 0.15;
+
+
+    if (
+        zoom < 0.55
+    ) {
+
+        zoom = 0.55;
+
+    }
+
+};
+
+
+/* =====================================================
+   CLICK TO CRACK
+===================================================== */
+
+canvas.onclick =
+function() {
+
+    if (dragging) {
+        return;
+    }
+
+
+    /*
+       Grow crack.
+    */
+
+    if (
+        crackStage < 5
+    ) {
+
+        crackStage++;
+
+        return;
+
+    }
+
+
+    /*
+       Final click:
+       split egg.
+    */
+
+    if (
+        crackStage === 5
+    ) {
+
+        crackStage = 6;
+
+        shellOpened = true;
+
+
+        /*
+           Activate physics.
+        */
+
+        leftShell.falling =
+            true;
+
+        rightShell.falling =
+            true;
+
+    }
+
+};
+
+
+/* =====================================================
+   DRAG ROTATION
+===================================================== */
+
+canvas.onmousedown =
+function(e) {
+
+    if (shellOpened) {
+        return;
+    }
+
+
+    dragging = true;
+
+    lastX =
+        e.clientX;
+
+    lastY =
+        e.clientY;
+
+};
+
+
+window.onmouseup =
+function() {
+
+    dragging = false;
+
+};
+
+
+canvas.onmousemove =
+function(e) {
+
+    if (!dragging) {
+        return;
+    }
+
+
+    rotationY +=
+        (
+            e.clientX -
+            lastX
+        ) *
+        0.012;
+
+
+    rotationX +=
+        (
+            e.clientY -
+            lastY
+        ) *
+        0.008;
+
+
+    if (
+        rotationX > 1
+    ) {
+
+        rotationX = 1;
+
+    }
+
+
+    if (
+        rotationX < -1
+    ) {
+
+        rotationX = -1;
+
+    }
+
+
+    lastX =
+        e.clientX;
+
+    lastY =
+        e.clientY;
+
+};
+
+
+/* =====================================================
+   3D ROTATION
+===================================================== */
+
+function rotatePoint(
+    x,
+    y,
+    z,
+    ry,
+    rx
+) {
+
+    var cy =
+        Math.cos(ry);
+
+    var sy =
+        Math.sin(ry);
+
+
+    var x1 =
+        x * cy -
+        z * sy;
+
+
+    var z1 =
+        x * sy +
+        z * cy;
+
+
+    var cx =
+        Math.cos(rx);
+
+    var sx =
+        Math.sin(rx);
+
+
+    var y1 =
+        y * cx -
+        z1 * sx;
+
+
+    var z2 =
+        y * sx +
+        z1 * cx;
+
+
+    return {
+
+        x:x1,
+
+        y:y1,
+
+        z:z2
+
+    };
+
+}
+
+
+/* =====================================================
+   PROJECTION
+===================================================== */
+
+function project(p) {
+
+    var depth =
+        camera -
+        p.z;
+
+
+    var scale =
+        camera /
+        depth;
+
+
+    scale *= zoom;
+
+
+    return {
+
+        x:
+            300 +
+            p.x * scale,
+
+        y:
+            300 -
+            p.y * scale,
+
+        z:
+            p.z
+
+    };
+
+}
+
+
+/* =====================================================
+   CRACK DRAWING
+===================================================== */
+
+function drawCrack() {
+
+    if (
+        crackStage === 0
+    ) {
+
+        return;
+
+    }
+
+
+    var amount;
+
+
+    if (
+        crackStage === 1
+    ) {
+
+        amount = 5;
+
+    }
+
+    else if (
+        crackStage === 2
+    ) {
+
+        amount = 11;
+
+    }
+
+    else if (
+        crackStage === 3
+    ) {
+
+        amount = 19;
+
+    }
+
+    else {
+
+        amount =
+            crackPoints.length;
+
+    }
+
+
+    ctx.beginPath();
+
+
+    for (
+        i = 0;
+        i < amount;
+        i++
+    ) {
+
+        var p =
+            crackPoints[i];
+
+
+        if (
+            i === 0
+        ) {
+
+            ctx.moveTo(
+                p.x,
+                p.y
+            );
+
+        }
+
+        else {
+
+            ctx.lineTo(
+                p.x,
+                p.y
+            );
+
+        }
+
+    }
+
+
+    ctx.strokeStyle =
+        "#554a3b";
+
+    ctx.lineWidth = 4;
+
+    ctx.lineCap =
+        "round";
+
+    ctx.lineJoin =
+        "round";
+
+    ctx.stroke();
+
+
+    /*
+       Branches.
+    */
+
+    if (
+        crackStage >= 2
+    ) {
+
+        drawBranch(
+            303,
+            180,
+            -30
+        );
+
+    }
+
+
+    if (
+        crackStage >= 3
+    ) {
+
+        drawBranch(
+            297,
+            270,
+            35
+        );
+
+    }
+
+
+    if (
+        crackStage >= 4
+    ) {
+
+        drawBranch(
+            302,
+            350,
+            -28
+        );
+
+    }
+
+}
+
+
+/* =====================================================
+   BRANCH
+===================================================== */
+
+function drawBranch(
+    x,
+    y,
+    direction
+) {
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        x,
+        y
+    );
+
+    ctx.lineTo(
+        x +
+        direction * 0.5,
+        y - 15
+    );
+
+    ctx.lineTo(
+        x +
+        direction,
+        y - 27
+    );
+
+
+    ctx.strokeStyle =
+        "#625744";
+
+    ctx.lineWidth =
+        2.5;
+
+    ctx.stroke();
+
+}
+
+
+/* =====================================================
+   SHELL FACE
+===================================================== */
+
+function drawFace(
+    a,
+    b,
+    c,
+    d,
+    brightness
+) {
+
+    if (
+        brightness > 255
+    ) {
+
+        brightness = 255;
+
+    }
+
+
+    if (
+        brightness < 145
+    ) {
+
+        brightness = 145;
+
+    }
+
+
+    ctx.fillStyle =
+        "rgb(" +
+        Math.floor(
+            brightness
+        ) +
+        "," +
+        Math.floor(
+            brightness - 3
+        ) +
+        "," +
+        Math.floor(
+            brightness - 14
+        ) +
+        ")";
+
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        a.x,
+        a.y
+    );
+
+    ctx.lineTo(
+        b.x,
+        b.y
+    );
+
+    ctx.lineTo(
+        c.x,
+        c.y
+    );
+
+    ctx.lineTo(
+        d.x,
+        d.y
+    );
+
+    ctx.closePath();
+
+    ctx.fill();
+
+}
+
+
+/* =====================================================
+   SHELL HALF
+===================================================== */
+
+function drawShellHalf(
+    side,
+    state
+) {
+
+    var outerPoints = [];
+
+    var innerPoints = [];
+
+    var thickness = 9;
+
+
+    /*
+       Each shell has its own
+       rotation.
+    */
+
+    var ry =
+        rotationY +
+        state.rotation;
+
+
+    var rx =
+        rotationX;
+
+
+    /*
+       OUTER + INNER SURFACES
+    */
+
+    for (
+        i = 0;
+        i < egg.length;
+        i++
+    ) {
+
+        outerPoints[i] = [];
+
+        innerPoints[i] = [];
+
+
+        for (
+            j = 0;
+            j < segments;
+            j++
+        ) {
+
+            var angle =
+                j /
+                segments *
+                Math.PI *
+                2;
+
+
+            /*
+               OUTER RADIUS
+            */
+
+            var x =
+                Math.cos(angle) *
+                egg[i].radius;
+
+
+            var z =
+                Math.sin(angle) *
+                egg[i].radius;
+
+
+            /*
+               Keep only correct
+               half.
+            */
+
+            if (
+                side < 0 &&
+                x > 0
+            ) {
+
+                x = 0;
+
+            }
+
+
+            if (
+                side > 0 &&
+                x < 0
+            ) {
+
+                x = 0;
+
+            }
+
+
+            /*
+               Separate halves.
+            */
+
+            x +=
+                state.x;
+
+
+            /*
+               Vertical physics.
+            */
+
+            var y =
+                egg[i].y +
+                state.y;
+
+
+            var outer =
+                rotatePoint(
+                    x,
+                    y,
+                    z,
+                    ry,
+                    rx
+                );
+
+
+            outerPoints[i][j] =
+                project(
+                    outer
+                );
+
+
+            /*
+               INNER RADIUS
+            */
+
+            var innerRadius =
+                egg[i].radius -
+                thickness;
+
+
+            if (
+                innerRadius < 2
+            ) {
+
+                innerRadius = 2;
+
+            }
+
+
+            var ix =
+                Math.cos(angle) *
+                innerRadius;
+
+
+            var iz =
+                Math.sin(angle) *
+                innerRadius;
+
+
+            if (
+                side < 0 &&
+                ix > 0
+            ) {
+
+                ix = 0;
+
+            }
+
+
+            if (
+                side > 0 &&
+                ix < 0
+            ) {
+
+                ix = 0;
+
+            }
+
+
+            ix +=
+                state.x;
+
+
+            var inner =
+                rotatePoint(
+                    ix,
+                    y,
+                    iz,
+                    ry,
+                    rx
+                );
+
+
+            innerPoints[i][j] =
+                project(
+                    inner
+                );
+
+        }
+
+    }
+
+
+    /*
+       OUTER SHELL
+    */
+
+    for (
+        i = 0;
+        i < egg.length - 1;
+        i++
+    ) {
+
+        for (
+            j = 0;
+            j < segments;
+            j++
+        ) {
+
+            var next =
+                (
+                    j + 1
+                ) %
+                segments;
+
+
+            var midAngle =
+                (
+                    j + 0.5
+                ) /
+                segments *
+                Math.PI *
+                2;
+
+
+            var midX =
+                Math.cos(
+                    midAngle
+                );
+
+
+            if (
+                side < 0 &&
+                midX > 0
+            ) {
+
+                continue;
+
+            }
+
+
+            if (
+                side > 0 &&
+                midX < 0
+            ) {
+
+                continue;
+
+            }
+
+
+            var a =
+                outerPoints[i][j];
+
+            var b =
+                outerPoints[i][next];
+
+            var c =
+                outerPoints[i + 1][next];
+
+            var d =
+                outerPoints[i + 1][j];
+
+
+            var brightness =
+                235 +
+                (
+                    a.z +
+                    b.z +
+                    c.z +
+                    d.z
+                ) *
+                0.045;
+
+
+            drawFace(
+                a,
+                b,
+                c,
+                d,
+                brightness
+            );
+
+        }
+
+    }
+
+
+    /*
+       INNER SHELL
+
+       Darker interior makes the
+       hollow shell obvious.
+    */
+
+    for (
+        i = 0;
+        i < egg.length - 1;
+        i++
+    ) {
+
+        for (
+            j = 0;
+            j < segments;
+            j++
+        ) {
+
+            var next2 =
+                (
+                    j + 1
+                ) %
+                segments;
+
+
+            var midAngle2 =
+                (
+                    j + 0.5
+                ) /
+                segments *
+                Math.PI *
+                2;
+
+
+            var midX2 =
+                Math.cos(
+                    midAngle2
+                );
+
+
+            if (
+                side < 0 &&
+                midX2 > 0
+            ) {
+
+                continue;
+
+            }
+
+
+            if (
+                side > 0 &&
+                midX2 < 0
+            ) {
+
+                continue;
+
+            }
+
+
+            var ia =
+                innerPoints[i][j];
+
+            var ib =
+                innerPoints[i][next2];
+
+            var ic =
+                innerPoints[i + 1][next2];
+
+            var id =
+                innerPoints[i + 1][j];
+
+
+            drawFace(
+                ia,
+                ib,
+                ic,
+                id,
+                180
+            );
+
+        }
+
+    }
+
+
+    /*
+       THICK BROKEN EDGE
+    */
+
+    drawBrokenEdge(
+        side,
+        state,
+        egg
+    );
+
+}
+
+
+/* =====================================================
+   BROKEN EDGE
+===================================================== */
+
+function drawBrokenEdge(
+    side,
+    state,
+    geometry
+) {
+
+    var edgeOuter = [];
+
+    var edgeInner = [];
+
+
+    for (
+        i = 0;
+        i < geometry.length;
+        i++
+    ) {
+
+        /*
+           Center cut.
+        */
+
+        var angle;
+
+
+        if (
+            side < 0
+        ) {
+
+            angle =
+                Math.PI / 2;
+
+        }
+
+        else {
+
+            angle =
+                Math.PI * 1.5;
+
+        }
+
+
+        var outerZ =
+            Math.sin(angle) *
+            geometry[i].radius;
+
+
+        var innerRadius =
+            Math.max(
+                2,
+                geometry[i].radius -
+                9
+            );
+
+
+        var innerZ =
+            Math.sin(angle) *
+            innerRadius;
+
+
+        var y =
+            geometry[i].y +
+            state.y;
+
+
+        var outer =
+            rotatePoint(
+                state.x,
+                y,
+                outerZ,
+                rotationY +
+                state.rotation,
+                rotationX
+            );
+
+
+        var inner =
+            rotatePoint(
+                state.x,
+                y,
+                innerZ,
+                rotationY +
+                state.rotation,
+                rotationX
+            );
+
+
+        edgeOuter.push(
+            project(outer)
+        );
+
+        edgeInner.push(
+            project(inner)
+        );
+
+    }
+
+
+    /*
+       Draw thick shell edge.
+    */
+
+    for (
+        i = 0;
+        i < edgeOuter.length - 1;
+        i++
+    ) {
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            edgeOuter[i].x,
+            edgeOuter[i].y
+        );
+
+        ctx.lineTo(
+            edgeOuter[i + 1].x,
+            edgeOuter[i + 1].y
+        );
+
+        ctx.lineTo(
+            edgeInner[i + 1].x,
+            edgeInner[i + 1].y
+        );
+
+        ctx.lineTo(
+            edgeInner[i].x,
+            edgeInner[i].y
+        );
+
+        ctx.closePath();
+
+
+        ctx.fillStyle =
+            "#d6c8a8";
+
+        ctx.fill();
+
+    }
+
+}
+
+
+/* =====================================================
+   GRAVITY ENGINE
+===================================================== */
+
+function updatePhysics() {
+
+    if (
+        !shellOpened
+    ) {
+
+        return;
+
+    }
+
+
+    /*
+       LEFT SHELL
+    */
+
+    if (
+        leftShell.falling
+    ) {
+
+        /*
+           Gravity increases
+           downward velocity.
+        */
+
+        leftShell.vy +=
+            gravity;
+
+
+        /*
+           Apply velocity.
+        */
+
+        leftShell.x +=
+            leftShell.vx;
+
+
+        leftShell.y +=
+            leftShell.vy;
+
+
+        /*
+           Rotation.
+        */
+
+        leftShell.rotation +=
+            leftShell.angularVelocity;
+
+
+        /*
+           Ground collision.
+        */
+
+        if (
+            leftShell.y >
+            groundY
+        ) {
+
+            leftShell.y =
+                groundY;
+
+
+            /*
+               Bounce upward.
+            */
+
+            leftShell.vy *=
+                -bounce;
+
+
+            /*
+               Ground friction.
+            */
+
+            leftShell.vx *=
+                0.78;
+
+
+            leftShell.angularVelocity *=
+                0.82;
+
+
+            /*
+               Stop tiny bouncing.
+            */
+
+            if (
+                Math.abs(
+                    leftShell.vy
+                ) < 0.8
+            ) {
+
+                leftShell.vy = 0;
+
+            }
+
+        }
+
+    }
+
+
+    /*
+       RIGHT SHELL
+    */
+
+    if (
+        rightShell.falling
+    ) {
+
+        rightShell.vy +=
+            gravity;
+
+
+        rightShell.x +=
+            rightShell.vx;
+
+
+        rightShell.y +=
+            rightShell.vy;
+
+
+        rightShell.rotation +=
+            rightShell.angularVelocity;
+
+
+        if (
+            rightShell.y >
+            groundY
+        ) {
+
+            rightShell.y =
+                groundY;
+
+
+            rightShell.vy *=
+                -bounce;
+
+
+            rightShell.vx *=
+                0.78;
+
+
+            rightShell.angularVelocity *=
+                0.82;
+
+
+            if (
+                Math.abs(
+                    rightShell.vy
+                ) < 0.8
+            ) {
+
+                rightShell.vy = 0;
+
+            }
+
+        }
+
+    }
+
+}
+
+
+/* =====================================================
+   HATCH LIGHT
+===================================================== */
+
+function drawHatchLight() {
+
+    if (
+        !shellOpened
+    ) {
+
+        return;
+
+    }
+
+
+    lightTime +=
+        0.035;
+
+
+    var pulse =
+        (
+            Math.sin(
+                lightTime
+            ) +
+            1
+        ) / 2;
+
+
+    var radius =
+        35 +
+        pulse * 20;
+
+
+    var glow =
+        ctx.createRadialGradient(
+            300,
+            335,
+            2,
+            300,
+            335,
+            radius
+        );
+
+
+    glow.addColorStop(
+        0,
+        "rgba(255,255,255,0.95)"
+    );
+
+
+    glow.addColorStop(
+        0.35,
+        "rgba(255,242,175,0.65)"
+    );
+
+
+    glow.addColorStop(
+        1,
+        "rgba(255,215,100,0)"
+    );
+
+
+    ctx.beginPath();
+
+    ctx.arc(
+        300,
+        335,
+        radius,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle =
+        glow;
+
+    ctx.fill();
+
+
+    /*
+       Floating light particles.
+    */
+
+    for (
+        i = 0;
+        i < 8;
+        i++
+    ) {
+
+        var angle =
+            lightTime *
+            0.7 +
+            i;
+
+
+        var distance =
+            30 +
+            pulse * 20;
+
+
+        var px =
+            300 +
+            Math.cos(angle) *
+            distance;
+
+
+        var py =
+            335 +
+            Math.sin(angle) *
+            distance;
+
+
+        ctx.beginPath();
+
+        ctx.arc(
+            px,
+            py,
+            2.5,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.fillStyle =
+            "rgba(255,235,150,0.75)";
+
+        ctx.fill();
+
+    }
+
+}
+
+
+/* =====================================================
+   INTACT EGG
+===================================================== */
+
+function drawIntactEgg() {
+
+    var points = [];
+
+
+    /*
+       Vertices.
+    */
+
+    for (
+        i = 0;
+        i < egg.length;
+        i++
+    ) {
+
+        points[i] = [];
+
+
+        for (
+            j = 0;
+            j < segments;
+            j++
+        ) {
+
+            var angle =
+                j /
+                segments *
+                Math.PI *
+                2;
+
+
+            var x =
+                Math.cos(angle) *
+                egg[i].radius;
+
+
+            var z =
+                Math.sin(angle) *
+                egg[i].radius;
+
+
+            var p =
+                rotatePoint(
+                    x,
+                    egg[i].y,
+                    z,
+                    rotationY,
+                    rotationX
+                );
+
+
+            points[i][j] =
+                project(p);
+
+        }
+
+    }
+
+
+    /*
+       Faces.
+    */
+
+    for (
+        i = 0;
+        i < egg.length - 1;
+        i++
+    ) {
+
+        for (
+            j = 0;
+            j < segments;
+            j++
+        ) {
+
+            var next =
+                (
+                    j + 1
+                ) %
+                segments;
+
+
+            var a =
+                points[i][j];
+
+            var b =
+                points[i][next];
+
+            var c =
+                points[i + 1][next];
+
+            var d =
+                points[i + 1][j];
+
+
+            var brightness =
+                235 +
+                (
+                    a.z +
+                    b.z +
+                    c.z +
+                    d.z
+                ) *
+                0.045;
+
+
+            drawFace(
+                a,
+                b,
+                c,
+                d,
+                brightness
+            );
+
+        }
+
+    }
+
+
+    /*
+       Crack on top.
+    */
+
+    drawCrack();
+
+}
+
+
+/* =====================================================
+   MAIN RENDER LOOP
+===================================================== */
+
+function draw() {
+
+    ctx.clearRect(
+        0,
+        0,
+        600,
+        600
+    );
+
+
+    /*
+       Ground shadow.
+    */
+
+    ctx.beginPath();
+
+    ctx.ellipse(
+        300,
+        520,
+        145,
+        22,
+        0,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle =
+        "rgba(0,0,0,0.22)";
+
+    ctx.fill();
+
+
+    /*
+       Physics first.
+    */
+
+    updatePhysics();
+
+
+    /*
+       Intact egg.
+    */
+
+    if (
+        !shellOpened
+    ) {
+
+        drawIntactEgg();
+
+    }
+
+    else {
+
+        /*
+           Light behind shells.
+        */
+
+        drawHatchLight();
+
+
+        /*
+           Left half.
+        */
+
+        drawShellHalf(
+            -1,
+            leftShell
+        );
+
+
+        /*
+           Right half.
+        */
+
+        drawShellHalf(
+            1,
+            rightShell
+        );
+
+    }
+
+
+    requestAnimationFrame(
+        draw
+    );
+
+}
+
+
+/* =====================================================
+   START
+===================================================== */
+
+resetEgg();
+
+draw();
+
+</script>
+    </body>
+</html>
